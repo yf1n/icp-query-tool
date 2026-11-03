@@ -23,6 +23,7 @@ HTML_PAGE = """<!doctype html>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ICP备案查询</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231f8ae6'/%3E%3Ccircle cx='11' cy='11' r='5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='m15.5 15.5 4 4' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E" />
   <style>
     :root {
       --bg: #eef3f8;
@@ -71,6 +72,10 @@ HTML_PAGE = """<!doctype html>
     textarea { width: 100%; min-height: 120px; resize: vertical; line-height: 1.5; }
     input:focus, select:focus, textarea:focus { border-color: #7cb8f4; }
     .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       border-color: var(--primary);
       background: var(--primary);
       color: #fff;
@@ -79,6 +84,10 @@ HTML_PAGE = """<!doctype html>
       cursor: pointer;
     }
     .btn-alt {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       background: #fff;
       color: var(--text);
       min-width: 120px;
@@ -94,6 +103,9 @@ HTML_PAGE = """<!doctype html>
     th, td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
     th { background: var(--head); font-weight: 700; }
     .op-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       border: 1px solid var(--primary);
       color: var(--primary);
       background: #fff;
@@ -118,6 +130,9 @@ HTML_PAGE = """<!doctype html>
     .hidden { display: none; }
     .pager { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
     .pager button {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       border: 1px solid var(--line);
       background: #fff;
       color: var(--text);
@@ -126,6 +141,53 @@ HTML_PAGE = """<!doctype html>
       cursor: pointer;
     }
     .pager button:disabled { opacity: .5; cursor: not-allowed; }
+    .icon { width: 15px; height: 15px; flex: 0 0 auto; vertical-align: -2px; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, .45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .modal.hidden { display: none; }
+    .modal-panel {
+      background: var(--card);
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, .25);
+      width: 100%;
+      max-width: 980px;
+      max-height: calc(100vh - 36px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-hd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+      background: linear-gradient(90deg, #f8fbff, #f3f7fc);
+    }
+    .modal-bd { padding: 14px 16px; overflow: auto; }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--sub);
+      cursor: pointer;
+    }
+    .icon-btn:hover { color: var(--text); border-color: #9fc4e8; }
   </style>
 </head>
 <body>
@@ -168,8 +230,14 @@ sf-express.com</textarea>
           </div>
         </div>
         <div class="row">
-          <button id="runBtn" type="button" class="btn" onclick="window.__manualRun && window.__manualRun()">搜索</button>
-          <button id="csvBtn" type="button" class="btn-alt" onclick="window.__manualExport && window.__manualExport()" disabled>导出CSV</button>
+          <button id="runBtn" type="button" class="btn" onclick="window.__manualRun && window.__manualRun()">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            搜索
+          </button>
+          <button id="csvBtn" type="button" class="btn-alt" onclick="window.__manualExport && window.__manualExport()" disabled>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            导出 CSV
+          </button>
         </div>
         <div id="status" class="status"></div>
       </div>
@@ -197,21 +265,28 @@ sf-express.com</textarea>
       </div>
     </div>
 
-    <div id="detailCard" class="card hidden">
-      <div class="hd">详情</div>
-      <div class="bd">
-        <div id="detailHint" class="muted"></div>
-        <div id="subjectBlock" class="hidden">
-          <div class="sec-title">ICP备案主体信息</div>
-          <table class="kv"><tbody id="subjectBody"></tbody></table>
+    <div id="detailCard" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="modal-panel">
+        <div class="modal-hd">
+          <span id="detailTitle">详情</span>
+          <button id="detailClose" type="button" class="icon-btn" aria-label="关闭详情">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
-        <div id="serviceBlock" class="hidden">
-          <div class="sec-title">ICP备案服务信息</div>
-          <table class="kv"><tbody id="serviceBody"></tbody></table>
-        </div>
-        <div id="otherBlock" class="hidden">
-          <div class="sec-title">其他信息</div>
-          <table class="kv"><tbody id="otherBody"></tbody></table>
+        <div id="detailBody" class="modal-bd">
+          <div id="detailHint" class="muted"></div>
+          <div id="subjectBlock" class="hidden">
+            <div class="sec-title">ICP备案主体信息</div>
+            <table class="kv"><tbody id="subjectBody"></tbody></table>
+          </div>
+          <div id="serviceBlock" class="hidden">
+            <div class="sec-title">ICP备案服务信息</div>
+            <table class="kv"><tbody id="serviceBody"></tbody></table>
+          </div>
+          <div id="otherBlock" class="hidden">
+            <div class="sec-title">其他信息</div>
+            <table class="kv"><tbody id="otherBody"></tbody></table>
+          </div>
         </div>
       </div>
     </div>
@@ -263,6 +338,12 @@ sf-express.com</textarea>
       limitAccess: "前置审批",
       updateRecordTime: "审核日期",
     };
+
+    const ICON_OK = "<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m5 13 4 4L19 7'/></svg>";
+    const ICON_FAIL = "<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 6 6 18'/><path d='m6 6 12 12'/></svg>";
+    const ICON_DETAIL = "<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><path d='M12 11v5'/><path d='M12 8h.01'/></svg>";
+    const ICON_PREV = "<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m15 18-6-6 6-6'/></svg>";
+    const ICON_NEXT = "<svg class='icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m9 18 6-6-6-6'/></svg>";
 
     function esc(v) {
       return String(v == null ? "" : v)
@@ -334,8 +415,22 @@ sf-express.com</textarea>
       serviceBlock.classList.toggle("hidden", !renderKV(serviceBody, service));
       otherBlock.classList.toggle("hidden", !renderKV(otherBody, other));
       detailCard.classList.remove("hidden");
-      detailCard.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.body.style.overflow = "hidden";
+      document.getElementById("detailBody").scrollTop = 0;
     }
+
+    function closeDetail() {
+      detailCard.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("detailClose").addEventListener("click", closeDetail);
+    detailCard.addEventListener("click", function(e) {
+      if (e.target === detailCard) closeDetail();
+    });
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && !detailCard.classList.contains("hidden")) closeDetail();
+    });
 
     function renderRows(rows) {
       resultBody.innerHTML = "";
@@ -349,8 +444,8 @@ sf-express.com</textarea>
           "<td>" + esc(rec.natureName || "") + "</td>" +
           "<td>" + esc(rec.serviceLicence || "") + "</td>" +
           "<td>" + esc(rec.updateRecordTime || "") + "</td>" +
-          "<td class='" + (failed ? "bad" : "ok") + "'>" + esc(failed ? (row.error || "失败") : "成功") + "</td>" +
-          "<td>" + ((!failed && rec && Object.keys(rec).length > 0) ? ("<button type='button' class='op-btn' data-i='" + i + "'>详情</button>") : "-") + "</td>";
+          "<td class='" + (failed ? "bad" : "ok") + "'>" + (failed ? ICON_FAIL : ICON_OK) + esc(failed ? (row.error || "失败") : "成功") + "</td>" +
+          "<td>" + ((!failed && rec && Object.keys(rec).length > 0) ? ("<button type='button' class='op-btn' data-i='" + i + "'>" + ICON_DETAIL + "详情</button>") : "-") + "</td>";
         resultBody.appendChild(tr);
       });
       resultBody.querySelectorAll("button[data-i]").forEach(btn => {
@@ -377,9 +472,9 @@ sf-express.com</textarea>
       renderRows(rows);
 
       pagerEl.classList.remove("hidden");
-      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + (localPage <= 1 ? "disabled" : "") + ">上一页</button>" +
+      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + (localPage <= 1 ? "disabled" : "") + ">" + ICON_PREV + "上一页</button>" +
                          "<span>第 " + localPage + "/" + pages + " 页，共 " + total + " 条</span>" +
-                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">下一页</button>";
+                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">下一页" + ICON_NEXT + "</button>";
       document.getElementById("pgPrev").onclick = function() { localPage -= 1; renderLocalPager(); };
       document.getElementById("pgNext").onclick = function() { localPage += 1; renderLocalPager(); };
     }
@@ -397,9 +492,9 @@ sf-express.com</textarea>
 
     function renderRemotePager() {
       pagerEl.classList.remove("hidden");
-      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + ((remotePage <= 1 || loading) ? "disabled" : "") + ">上一页</button>" +
+      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + ((remotePage <= 1 || loading) ? "disabled" : "") + ">" + ICON_PREV + "上一页</button>" +
                          "<span>第 " + remotePage + "/" + remotePages + " 页，共 " + remoteTotal + " 条</span>" +
-                          "<button type='button' id='pgNext' " + ((remotePage >= remotePages || loading) ? "disabled" : "") + ">下一页</button>";
+                          "<button type='button' id='pgNext' " + ((remotePage >= remotePages || loading) ? "disabled" : "") + ">下一页" + ICON_NEXT + "</button>";
       document.getElementById("pgPrev").onclick = async function() { if (remotePage > 1) await loadRemotePage(remotePage - 1); };
       document.getElementById("pgNext").onclick = async function() { if (remotePage < remotePages) await loadRemotePage(remotePage + 1); };
     }
@@ -475,7 +570,7 @@ sf-express.com</textarea>
       resultBody.innerHTML = "";
       pagerEl.classList.add("hidden");
       pagerEl.innerHTML = "";
-      detailCard.classList.add("hidden");
+      closeDetail();
 
       lastResults = [];
       localRows = [];
