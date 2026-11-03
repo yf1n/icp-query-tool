@@ -13,6 +13,7 @@ from miit_icp_auto_query import MiitIcpAutoClient
 
 app = FastAPI(title="MIIT ICP Query Web")
 QUERY_SESSION_TTL = 15 * 60
+MAX_EXPORT_PAGES = 2000
 QUERY_SESSIONS: dict[str, dict[str, Any]] = {}
 
 
@@ -378,7 +379,7 @@ sf-express.com</textarea>
       pagerEl.classList.remove("hidden");
       pagerEl.innerHTML = "<button type='button' id='pgPrev' " + (localPage <= 1 ? "disabled" : "") + ">Prev</button>" +
                          "<span>Page " + localPage + "/" + pages + ", total " + total + "</span>" +
-                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">Prev</button>";
+                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">Next</button>";
       document.getElementById("pgPrev").onclick = function() { localPage -= 1; renderLocalPager(); };
       document.getElementById("pgNext").onclick = function() { localPage += 1; renderLocalPager(); };
     }
@@ -421,7 +422,7 @@ sf-express.com</textarea>
       }
       lastResults = [{
         query: remoteKeyword,
-        query_type: remoteKeyword.includes(".") ? "domain" : "subject",
+        query_type: remoteKeyword.includes(".") ? "域名" : "主体",
         ok: true,
         count: merged.length,
         record_columns: Array.from(colSet),
@@ -529,7 +530,7 @@ sf-express.com</textarea>
           let seq = 1;
           for (const g of lastResults) {
             if (!g.ok) {
-              localRows.push({ seq: seq++, query: g.query || "", status: "Success", error: g.error || "", record: null });
+              localRows.push({ seq: seq++, query: g.query || "", status: "Failed", error: g.error || "Failed", record: null });
               continue;
             }
             const rs = Array.isArray(g.records) ? g.records : [];
@@ -554,19 +555,45 @@ sf-express.com</textarea>
     }
 
     async function exportCsv() {
-      if (!lastResults.length) return;
-      const resp = await fetch("/api/export_csv", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ results: lastResults })
-      });
-      if (!resp.ok) return;
-      const blob = await resp.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "icp_batch_results.csv";
-      a.click();
-      URL.revokeObjectURL(a.href);
+      if (!remoteSessionId && !lastResults.length) return;
+      csvBtn.disabled = true;
+      try {
+        let resp;
+        if (remoteSessionId) {
+          setStatus("Exporting all pages, please wait...", false);
+          resp = await fetch("/api/export_csv_all_by_session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: remoteSessionId })
+          });
+        } else {
+          setStatus("Exporting...", false);
+          resp = await fetch("/api/export_csv", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ results: lastResults })
+          });
+        }
+        if (!resp.ok) {
+          let detail = "HTTP " + resp.status;
+          try {
+            const errData = await resp.json();
+            if (errData && errData.detail) detail = errData.detail;
+          } catch (ignored) {}
+          throw new Error(detail);
+        }
+        const blob = await resp.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "icp_batch_results.csv";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setStatus("Export completed", false);
+      } catch (e) {
+        setStatus("Export failed: " + e.message, true);
+      } finally {
+        csvBtn.disabled = false;
+      }
     }
 
     window.__manualRun = runSearch;
@@ -740,6 +767,10 @@ class ExportRequest(BaseModel):
     results: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ExportAllSessionRequest(BaseModel):
+    session_id: str
+
+
 class StartQueryRequest(BaseModel):
     keyword: str
     service_type: int = 1
@@ -862,6 +893,19 @@ def _fetch_page_with_session(
     }
 
 
+def _verify_captcha(client: MiitIcpAutoClient, retries: int) -> int:
+    last_err: Exception | None = None
+    for _ in range(max(1, retries)):
+        try:
+            image_payload = client.get_check_images()
+            offset, _ = client.verify_slider(image_payload)
+            return offset
+        except Exception as exc:
+            last_err = exc
+            time.sleep(0.3)
+    raise RuntimeError(f"captcha verify failed: {last_err}")
+
+
 def _query_with_client(
     client: MiitIcpAutoClient,
     keyword: str,
@@ -870,18 +914,7 @@ def _query_with_client(
     page_size: int,
     max_pages: int,
 ) -> dict[str, Any]:
-    last_err: Exception | None = None
-    used_offset = -1
-    for _ in range(max(1, retries)):
-        try:
-            image_payload = client.get_check_images()
-            used_offset, _ = client.verify_slider(image_payload)
-            break
-        except Exception as exc:
-            last_err = exc
-            time.sleep(0.3)
-    else:
-        raise RuntimeError(f"captcha verify failed: {last_err}")
+    used_offset = _verify_captcha(client, retries)
 
     # 官方 ICP 备案查询前端使用 unitName + serviceType 参数；实测域名关键词也可查到主体信息。
     raw = client.query_company_all(
@@ -956,17 +989,10 @@ def start_query(req: StartQueryRequest) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"鉴权失败: {exc}")
 
-    last_err: Exception | None = None
-    for _ in range(max(1, req.retries)):
-        try:
-            image_payload = client.get_check_images()
-            client.verify_slider(image_payload)
-            break
-        except Exception as exc:
-            last_err = exc
-            time.sleep(0.3)
-    else:
-        raise HTTPException(status_code=500, detail=f"验证码失败: {last_err}")
+    try:
+        _verify_captcha(client, req.retries)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"验证码失败: {exc}")
 
     session_id = uuid.uuid4().hex
     sess = {
@@ -1050,12 +1076,51 @@ def batch_query(req: BatchQueryRequest) -> dict[str, Any]:
 
 @app.post("/api/export_csv")
 def export_csv(req: ExportRequest) -> StreamingResponse:
+    return _build_csv_response(req.results)
+
+
+@app.post("/api/export_csv_all_by_session")
+def export_csv_all_by_session(req: ExportAllSessionRequest) -> StreamingResponse:
+    sess = _get_query_session(req.session_id)
+    first = _fetch_page_with_session(sess, page_num=1)
+    pages = min(max(1, int(first.get("pages") or 1)), MAX_EXPORT_PAGES)
+    query = first.get("query", "")
+    query_type = first.get("query_type", "主体")
+
+    all_records: list[dict[str, Any]] = []
+    col_set: set[str] = set()
+
+    first_records = first.get("records") or []
+    for rec in first_records:
+        if isinstance(rec, dict):
+            all_records.append(rec)
+            col_set.update(rec.keys())
+
+    for pn in range(2, pages + 1):
+        page = _fetch_page_with_session(sess, page_num=pn)
+        for rec in page.get("records") or []:
+            if isinstance(rec, dict):
+                all_records.append(rec)
+                col_set.update(rec.keys())
+
+    results = [{
+        "query": query,
+        "query_type": query_type,
+        "ok": True,
+        "count": len(all_records),
+        "record_columns": sorted(col_set),
+        "records": all_records,
+    }]
+    return _build_csv_response(results)
+
+
+def _build_csv_response(results: list[dict[str, Any]]) -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output)
 
     dynamic_cols: list[str] = []
     seen: set[str] = set()
-    for row in req.results:
+    for row in results:
         for c in row.get("record_columns") or []:
             if c not in seen:
                 seen.add(c)
@@ -1064,7 +1129,7 @@ def export_csv(req: ExportRequest) -> StreamingResponse:
     header = ["query", "query_type", "ok", "count"] + dynamic_cols + ["error"]
     writer.writerow(header)
 
-    for row in req.results:
+    for row in results:
         query = row.get("query", "")
         query_type = row.get("query_type", "")
         ok = row.get("ok", False)

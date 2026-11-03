@@ -365,17 +365,17 @@ class MiitIcpAutoClient:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="??????? ICP ???????/???")
-    parser.add_argument("query", nargs="?", help="?????????????")
-    parser.add_argument("--company", default="", help="???????????")
-    parser.add_argument("--input", default="", help="??txt?????????????")
-    parser.add_argument("--output", default="", help="????json????????")
-    parser.add_argument("--service-type", type=int, default=1, help="1=??, 6=APP, 7=???, 8=???")
-    parser.add_argument("--page-size", type=int, default=10, help="??????")
-    parser.add_argument("--max-pages", type=int, default=2000, help="????????????")
-    parser.add_argument("--retries", type=int, default=5, help="???????")
-    parser.add_argument("--manual-offset", type=int, default=-1, help="???????????")
-    parser.add_argument("--transport", choices=["curl", "requests"], default="curl", help="????")
+    parser = argparse.ArgumentParser(description="工信部 ICP 备案自动查询工具（单条/批量）")
+    parser.add_argument("query", nargs="?", help="要查询的主体名称或域名")
+    parser.add_argument("--company", default="", help="要查询的主体名称或域名（兼容参数）")
+    parser.add_argument("--input", default="", help="txt 文件路径，每行一个查询词")
+    parser.add_argument("--output", default="", help="结果输出的 json 文件路径")
+    parser.add_argument("--service-type", type=int, default=1, help="1=网站, 6=APP, 7=小程序, 8=快应用")
+    parser.add_argument("--page-size", type=int, default=10, help="每页条数")
+    parser.add_argument("--max-pages", type=int, default=2000, help="最多翻页数")
+    parser.add_argument("--retries", type=int, default=5, help="验证码重试次数")
+    parser.add_argument("--manual-offset", type=int, default=-1, help="手动滑块偏移（调试用）")
+    parser.add_argument("--transport", choices=["curl", "requests"], default="curl", help="请求通道")
     args = parser.parse_args()
 
     def run_one(query_word: str) -> dict[str, Any]:
@@ -422,13 +422,13 @@ def main() -> None:
 
     if args.input:
         if args.manual_offset >= 0:
-            parser.error("????(--input)??? --manual-offset")
+            parser.error("批量查询(--input)不支持 --manual-offset")
         input_path = Path(args.input)
         if not input_path.exists():
-            parser.error(f"input ?????: {input_path}")
+            parser.error(f"input 文件不存在: {input_path}")
         queries = [line.strip() for line in input_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         if not queries:
-            parser.error("input ?????????")
+            parser.error("input 文件中没有有效查询词")
 
         all_results: list[dict[str, Any]] = []
         for idx2, q in enumerate(queries, start=1):
@@ -444,14 +444,14 @@ def main() -> None:
         if args.output:
             out_path = Path(args.output)
             out_path.write_text(text_out, encoding="utf-8")
-            print(f"[+] ???????: {out_path}")
+            print(f"[+] 结果已写入: {out_path}")
         else:
             print(text_out)
         return
 
     query = (args.query or args.company or "").strip()
     if not query:
-        parser.error("?????????? --input ????")
+        parser.error("请提供查询词，或使用 --input 指定批量文件")
 
     one = run_one(query)
     print(f"[+] captcha offset = {one['offset']}")
