@@ -247,21 +247,21 @@ sf-express.com</textarea>
     let remotePageRecords = {};
 
     const labelMap = {
-      domain: "Domain",
-      domainId: "Domain ID",
-      unitName: "Host Unit",
-      natureName: "Entity Type",
-      leaderName: "Owner",
-      mainLicence: "ICP Main License",
-      serviceLicence: "Service License",
-      serviceName: "Access Name",
-      contentTypeName: "Service Name",
-      accessName: "Access Name",
-      appName: "App Name",
-      miniProgramName: "Mini Program",
-      fastAppName: "Quick App",
-      limitAccess: "Pre-approval",
-      updateRecordTime: "Review Time",
+      domain: "域名",
+      domainId: "域名 ID",
+      unitName: "主办单位名称",
+      natureName: "主办单位性质",
+      leaderName: "负责人",
+      mainLicence: "主体备案号",
+      serviceLicence: "服务备案号",
+      serviceName: "服务名称",
+      contentTypeName: "内容类型",
+      accessName: "访问名称",
+      appName: "APP 名称",
+      miniProgramName: "小程序名称",
+      fastAppName: "快应用名称",
+      limitAccess: "前置审批",
+      updateRecordTime: "审核日期",
     };
 
     function esc(v) {
@@ -307,7 +307,7 @@ sf-express.com</textarea>
 
     function showDetail(row) {
       const rec = row.record || {};
-      detailHint.textContent = "Query: " + row.query + " | Service License: " + (rec.serviceLicence || "-") + " | Unit: " + (rec.unitName || "-");
+      detailHint.textContent = "查询词：" + row.query + " | 服务备案号：" + (rec.serviceLicence || "-") + " | 主办单位：" + (rec.unitName || "-");
       const subject = {
         mainLicence: rec.mainLicence || "",
         updateRecordTime: rec.updateRecordTime || "",
@@ -349,8 +349,8 @@ sf-express.com</textarea>
           "<td>" + esc(rec.natureName || "") + "</td>" +
           "<td>" + esc(rec.serviceLicence || "") + "</td>" +
           "<td>" + esc(rec.updateRecordTime || "") + "</td>" +
-          "<td class='" + (failed ? "bad" : "ok") + "'>" + esc(failed ? (row.error || "Failed") : "Success") + "</td>" +
-          "<td>" + ((!failed && rec && Object.keys(rec).length > 0) ? ("<button type='button' class='op-btn' data-i='" + i + "'>Detail</button>") : "-") + "</td>";
+          "<td class='" + (failed ? "bad" : "ok") + "'>" + esc(failed ? (row.error || "失败") : "成功") + "</td>" +
+          "<td>" + ((!failed && rec && Object.keys(rec).length > 0) ? ("<button type='button' class='op-btn' data-i='" + i + "'>详情</button>") : "-") + "</td>";
         resultBody.appendChild(tr);
       });
       resultBody.querySelectorAll("button[data-i]").forEach(btn => {
@@ -377,9 +377,9 @@ sf-express.com</textarea>
       renderRows(rows);
 
       pagerEl.classList.remove("hidden");
-      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + (localPage <= 1 ? "disabled" : "") + ">Prev</button>" +
-                         "<span>Page " + localPage + "/" + pages + ", total " + total + "</span>" +
-                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">Next</button>";
+      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + (localPage <= 1 ? "disabled" : "") + ">上一页</button>" +
+                         "<span>第 " + localPage + "/" + pages + " 页，共 " + total + " 条</span>" +
+                         "<button type='button' id='pgNext' " + (localPage >= pages ? "disabled" : "") + ">下一页</button>";
       document.getElementById("pgPrev").onclick = function() { localPage -= 1; renderLocalPager(); };
       document.getElementById("pgNext").onclick = function() { localPage += 1; renderLocalPager(); };
     }
@@ -397,9 +397,9 @@ sf-express.com</textarea>
 
     function renderRemotePager() {
       pagerEl.classList.remove("hidden");
-      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + ((remotePage <= 1 || loading) ? "disabled" : "") + ">Prev</button>" +
-                         "<span>Page " + remotePage + "/" + remotePages + ", total " + remoteTotal + "</span>" +
-                          "<button type='button' id='pgNext' " + ((remotePage >= remotePages || loading) ? "disabled" : "") + ">Next</button>";
+      pagerEl.innerHTML = "<button type='button' id='pgPrev' " + ((remotePage <= 1 || loading) ? "disabled" : "") + ">上一页</button>" +
+                         "<span>第 " + remotePage + "/" + remotePages + " 页，共 " + remoteTotal + " 条</span>" +
+                          "<button type='button' id='pgNext' " + ((remotePage >= remotePages || loading) ? "disabled" : "") + ">下一页</button>";
       document.getElementById("pgPrev").onclick = async function() { if (remotePage > 1) await loadRemotePage(remotePage - 1); };
       document.getElementById("pgNext").onclick = async function() { if (remotePage < remotePages) await loadRemotePage(remotePage + 1); };
     }
@@ -434,7 +434,7 @@ sf-express.com</textarea>
     async function loadRemotePage(pageNum) {
       if (!remoteSessionId || loading) return;
       loading = true;
-      setStatus("Loading page " + pageNum + "...", false);
+      setStatus("正在加载第 " + pageNum + " 页...", false);
       renderRemotePager();
       try {
         const resp = await fetch("/api/query_page", {
@@ -443,7 +443,7 @@ sf-express.com</textarea>
           body: JSON.stringify({ session_id: remoteSessionId, page_num: pageNum })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || "Query failed");
+        if (!resp.ok) throw new Error(data.detail || "查询失败");
         remotePage = Number(data.pageNum || pageNum || 1);
         remotePages = Math.max(1, Number(data.pages || 1));
         remoteTotal = Math.max(0, Number(data.total || 0));
@@ -453,9 +453,9 @@ sf-express.com</textarea>
         csvBtn.disabled = false;
         const rows = mapRemote(currentRecords, remotePage, Number(data.pageSize || remotePageSize || 10));
         renderRows(rows);
-        setStatus("Loaded page " + remotePage + "/" + remotePages + ", total " + remoteTotal, false);
+        setStatus("已加载第 " + remotePage + "/" + remotePages + " 页，共 " + remoteTotal + " 条", false);
       } catch (e) {
-        setStatus("Page load failed: " + e.message, true);
+        setStatus("翻页失败: " + e.message, true);
       } finally {
         loading = false;
         renderRemotePager();
@@ -465,13 +465,13 @@ sf-express.com</textarea>
     async function runSearch() {
       const keywords = splitLines(document.getElementById("keywords").value);
       if (!keywords.length) {
-        setStatus("Please input keyword", true);
+        setStatus("请先输入查询词", true);
         return;
       }
 
       runBtn.disabled = true;
       csvBtn.disabled = true;
-      setStatus("Searching...", false);
+      setStatus("查询中...", false);
       resultBody.innerHTML = "";
       pagerEl.classList.add("hidden");
       pagerEl.innerHTML = "";
@@ -502,7 +502,7 @@ sf-express.com</textarea>
             body: JSON.stringify({ keyword: keywords[0], page_size: localPageSize, ...commonPayload })
           });
           const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || "Query failed");
+          if (!resp.ok) throw new Error(data.detail || "查询失败");
 
           remoteSessionId = data.session_id || "";
           remoteKeyword = keywords[0];
@@ -516,7 +516,7 @@ sf-express.com</textarea>
           csvBtn.disabled = false;
           renderRows(mapRemote(firstRecords, remotePage, remotePageSize));
           renderRemotePager();
-          setStatus("Loaded page " + remotePage + "/" + remotePages + ", total " + remoteTotal + " (lazy paging)", false);
+          setStatus("已加载第 " + remotePage + "/" + remotePages + " 页，共 " + remoteTotal + " 条", false);
         } else {
           const delaySec = Number(document.getElementById("delaySec").value);
           const resp = await fetch("/api/batch_query", {
@@ -525,12 +525,12 @@ sf-express.com</textarea>
             body: JSON.stringify({ keywords, delay_sec: delaySec, ...commonPayload })
           });
           const data = await resp.json();
-          if (!resp.ok) throw new Error(data.detail || "Batch query failed");
+          if (!resp.ok) throw new Error(data.detail || "批量查询失败");
           lastResults = data.results || [];
           let seq = 1;
           for (const g of lastResults) {
             if (!g.ok) {
-              localRows.push({ seq: seq++, query: g.query || "", status: "Failed", error: g.error || "Failed", record: null });
+              localRows.push({ seq: seq++, query: g.query || "", status: "Failed", error: g.error || "失败", record: null });
               continue;
             }
             const rs = Array.isArray(g.records) ? g.records : [];
@@ -544,11 +544,11 @@ sf-express.com</textarea>
           }
           renderLocalPager();
           const okCount = lastResults.filter(x => x.ok).length;
-          setStatus("Done: " + okCount + "/" + lastResults.length + " succeeded", okCount !== lastResults.length);
+          setStatus("完成：" + okCount + "/" + lastResults.length + " 成功", okCount !== lastResults.length);
           csvBtn.disabled = localRows.length === 0;
         }
       } catch (e) {
-        setStatus("Failed: " + e.message, true);
+        setStatus("查询失败: " + e.message, true);
       } finally {
         runBtn.disabled = false;
       }
@@ -560,14 +560,14 @@ sf-express.com</textarea>
       try {
         let resp;
         if (remoteSessionId) {
-          setStatus("Exporting all pages, please wait...", false);
+          setStatus("正在导出全部页面，请稍候...", false);
           resp = await fetch("/api/export_csv_all_by_session", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ session_id: remoteSessionId })
           });
         } else {
-          setStatus("Exporting...", false);
+          setStatus("正在导出...", false);
           resp = await fetch("/api/export_csv", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -588,9 +588,9 @@ sf-express.com</textarea>
         a.download = "icp_batch_results.csv";
         a.click();
         URL.revokeObjectURL(a.href);
-        setStatus("Export completed", false);
+        setStatus("导出完成", false);
       } catch (e) {
-        setStatus("Export failed: " + e.message, true);
+        setStatus("导出失败: " + e.message, true);
       } finally {
         csvBtn.disabled = false;
       }
