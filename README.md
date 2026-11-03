@@ -63,17 +63,6 @@ python miit_icp_auto_query.py --input queries.txt --output result.json
 - `--retries`：验证码重试次数，默认 `5`
 - `--transport`：`curl` 或 `requests`，默认 `curl`
 - `--manual-offset`：手动滑块偏移（调试用，默认 `-1`）
-
-
-## 注意事项
-
-- 高频查询可能触发目标站风控（403），建议降低频率并重试。
-- 仅用于学习和合规场景，请遵守目标站点条款与相关法律法规。
-
-## License
-
-MIT
-
 ## Web 界面（2.0）
 
 启动：
@@ -85,6 +74,9 @@ python -m uvicorn miit_icp_web:app --host 0.0.0.0 --port 8000
 访问：
 
 - `http://127.0.0.1:8000`
+<img width="1591" height="793" alt="image" src="https://github.com/user-attachments/assets/6925a89c-f150-423d-a342-aeddac4faf17" />
+<img width="1368" height="895" alt="image" src="https://github.com/user-attachments/assets/a60edce3-90e8-454f-b73f-5e759446aea8" />
+
 
 说明：
 
@@ -92,3 +84,14 @@ python -m uvicorn miit_icp_web:app --host 0.0.0.0 --port 8000
 - 支持批量（文本框每行一个关键词）
 - 搜索结果列表 + 详情展开（空字段自动隐藏）
 - APP/小程序/快应用会补调详情接口 `queryDetailByAppAndMiniId`
+
+
+## 注意事项
+
+- 高频查询可能触发目标站风控（403），建议降低频率并重试。
+- 仅用于学习和合规场景，请遵守目标站点条款与相关法律法规。
+
+## License
+
+MIT
+
